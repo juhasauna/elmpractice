@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "summary": "Small elm demos I made for practice",
-    "repository": "https://github.com/JuhaSauna/elmdemo.git",
+    "repository": "https://github.com/juhasauna/elmpractice.git",
     "license": "",
     "source-directories": [
         "."
