@@ -34,10 +34,6 @@ strCS =
     toString cellSize
 
 
-
--- distance from corner
-
-
 main =
     Html.program
         { init = init
