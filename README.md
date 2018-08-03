@@ -1,7 +1,9 @@
-# Small elm practice projects
+# Elm practice: Rewriting coding train coding challenges in elm.
 
-# Inspiration from: https://github.com/CodingTrain/website/tree/master/CodingChallenges
+## Coding train coding challenges: 
+    * https://github.com/CodingTrain/website/tree/master/CodingChallenges
+    * https://www.youtube.com/thecodingtrain
 
-# To do: 
+## To do: 
     * L-system algorithm doesn't work properly.
     * Phyllotaxis slider is broken
