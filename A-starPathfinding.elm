@@ -78,7 +78,7 @@ type alias Model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model initGrid start False [ start ] [], Random.generate InitModel (Random.list (cellCount - 1) (Random.float 0 1)) )
+    ( Model initGrid start False [ start ] [], Random.generate AddObstacles (Random.list (cellCount - 1) (Random.float 0 1)) )
 
 
 initGrid : Array.Array Cell
@@ -106,7 +106,7 @@ initGrid =
 
 type Msg
     = Tick Time
-    | InitModel (List Float)
+    | AddObstacles (List Float)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -140,13 +140,34 @@ update msg model =
             in
             ( newModel, Cmd.none )
 
-        InitModel randFloats ->
+        AddObstacles randFloats ->
             let
-                firstCell =
-                    getCell start model.grid
+                addObstacles grid floats =
+                    let
+                        floatsLeft =
+                            List.length floats
+                    in
+                    if floatsLeft == 0 then
+                        grid
+                    else
+                        let
+                            newGrid =
+                                if (List.head floats |> Maybe.withDefault 0) < obstacleFrequency then
+                                    let
+                                        remainder =
+                                            rem floatsLeft dim
 
-                goalCell =
-                    getCell goal model.grid
+                                        notInFirstOrLastColumn =
+                                            remainder /= 0 && remainder /= (dim - 1)
+
+                                        cell =
+                                            getCell floatsLeft grid
+                                    in
+                                    Array.set floatsLeft { cell | obstacle = notInFirstOrLastColumn } grid
+                                else
+                                    grid
+                        in
+                        addObstacles newGrid (List.drop 1 floats)
 
                 newGrid =
                     addObstacles model.grid randFloats
@@ -171,38 +192,6 @@ dist i j =
 getCell : Int -> Array.Array Cell -> Cell
 getCell i arr =
     Array.get i arr |> Maybe.withDefault defaultCell
-
-
-addObstacles grid randFloats =
-    let
-        floatsLeft =
-            List.length randFloats
-    in
-    if floatsLeft == 0 then
-        grid
-    else
-        let
-            cell =
-                Array.get floatsLeft grid
-                    |> Maybe.withDefault defaultCell
-
-            randFloat =
-                List.head randFloats |> Maybe.withDefault 0
-
-            newGrid =
-                if randFloat < obstacleFrequency then
-                    let
-                        remainder =
-                            rem floatsLeft dim
-
-                        notInFirstOrLastColumn =
-                            remainder /= 0 && remainder /= (dim - 1)
-                    in
-                    Array.set floatsLeft { cell | obstacle = notInFirstOrLastColumn } grid
-                else
-                    grid
-        in
-        addObstacles newGrid (List.drop 1 randFloats)
 
 
 filterListFromList : List Int -> List Int -> List Int
