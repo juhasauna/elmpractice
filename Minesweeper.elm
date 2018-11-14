@@ -1,15 +1,18 @@
 module Main exposing (..)
 
+import Browser
+import Browser.Events
+import Json.Decode
 import Array
 import Html exposing (..)
 import Html.Attributes exposing (style, type_)
 import Html.Events exposing (..)
-import Mouse exposing (Position)
 import Random
 import Svg exposing (..)
 import Svg.Attributes as SvgA exposing (..)
 
 
+dim : Int
 dim =
     10
 
@@ -17,25 +20,25 @@ dim =
 cellCount =
     dim ^ 2
 
-
+cellSize : Int
 cellSize =
     20
 
-
+marg : Int
 marg =
     cellSize
 
 
 gridSize =
-    toString (dim * cellSize + marg + 1)
+    String.fromInt (dim * cellSize + marg + 1)
 
 
 strCS =
-    toString cellSize
+    String.fromInt cellSize
 
 
 main =
-    Html.program
+    Browser.element
         { init = init
         , view = view
         , update = update
@@ -54,6 +57,10 @@ type alias Cell =
 type alias GameOver =
     { win : Bool, lose : Bool }
 
+type alias Position =
+    { x : Int
+    , y : Int
+    }
 
 type alias Model =
     { position : Position
@@ -61,8 +68,8 @@ type alias Model =
     , gameOver : GameOver
     }
 
-
-init =
+init : () -> (Model, Cmd Msg)
+init _ =
     ( Model (Position 0 0) Array.empty (GameOver False False)
     , Random.generate InitModel (Random.list cellCount (Random.float 0 1))
     )
@@ -73,7 +80,7 @@ init =
 
 
 type Msg
-    = MouseDowns Position
+    = MouseDowns Int Int
     | InitModel (List Float)
     | Reset
 
@@ -87,8 +94,10 @@ update msg model =
         Reset ->
             ( model, Random.generate InitModel (Random.list cellCount (Random.float 0 1)) )
 
-        MouseDowns xy ->
+        MouseDowns xx yy ->
             let
+                (x,y) = (xx - cellSize // 2, yy- cellSize // 2)
+                _ = Debug.log "asdf" <| (String.fromInt x ++ " " ++ String.fromInt y)
                 getIndex =
                     let
                         inBounds val =
@@ -99,21 +108,22 @@ update msg model =
                             v >= 0 && v < dim * cellSize
 
                         isInBounds =
-                            inBounds xy.x && inBounds xy.y
+                            inBounds x && inBounds y
 
                         f val =
                             let
                                 v =
                                     val - marg
+                                    
                             in
-                            round ((toFloat v - dim) / toFloat cellSize)
+                            round (toFloat(v - dim) / (toFloat cellSize))
 
-                        ( x, y ) =
-                            ( f xy.x, f xy.y )
+                        ( x_, y_ ) =
+                            ( f x, f y )
 
                         ret =
                             if isInBounds then
-                                x + y * dim
+                                x_ + y_ * dim
                             else
                                 -1
                     in
@@ -146,7 +156,7 @@ update msg model =
                     else
                         grid
             in
-            ( { model | position = xy, grid = winGrid, gameOver = GameOver win lose }, Cmd.none )
+            ( { model | position = Position x y, grid = winGrid, gameOver = GameOver win lose }, Cmd.none )
 
 
 checkIfDone grid i =
@@ -226,10 +236,10 @@ getNeighbors i =
                 |> List.filter (\n -> n < cellCount)
 
         checkFirstAndLastCols =
-            if rem i dim == 0 then
+            if remainderBy dim i == 0 then
                 -- first col
                 List.filter (\n -> n /= i - 1 && n /= i - 1 - dim && n /= i - 1 + dim) neighbors
-            else if rem i dim == (dim - 1) then
+            else if remainderBy dim i == (dim - 1) then
                 -- last col
                 List.filter (\n -> n /= i + 1 && n /= i + 1 - dim && n /= i + 1 + dim) neighbors
             else
@@ -249,8 +259,18 @@ getCell i grid =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch [ Mouse.downs MouseDowns ]
+    
+    Sub.batch [ Browser.Events.onClick (Json.Decode.map2 MouseDowns pageX pageY) ]
 
+    -- Sub.batch [ Mouse.downs MouseDowns ]
+pageX : Json.Decode.Decoder Int
+pageX =
+  Json.Decode.field "pageX" Json.Decode.int
+
+
+pageY : Json.Decode.Decoder Int
+pageY =
+  Json.Decode.field "pageY" Json.Decode.int
 
 
 -- VIEW
@@ -274,7 +294,7 @@ view model =
             Array.map makeSvgWin model.grid |> Array.toList |> List.concat
 
         pad =
-            toString marg ++ "px"
+            String.fromInt marg ++ "px"
     in
     div
         []
@@ -284,9 +304,7 @@ view model =
             ]
             shapes
         , div
-            [ Html.Attributes.style
-                [ ( "padding", pad ) ]
-            ]
+            [ Html.Attributes.style "padding" pad]
             [ Html.text gameMsg, Html.br [] [], Html.button [ onClick Reset ] [ Html.text "Reset" ] ]
         ]
 
@@ -308,8 +326,7 @@ showMines grid i =
 initGrid floatMines =
     let
         xPoints =
-            -- List.map ((*) cellSize) (List.range 0 dim) |> List.map toString
-            List.range 0 dim |> List.map ((*) cellSize) |> List.map ((+) marg) |> List.map toString
+            List.range 0 dim |> List.map ((*) cellSize) |> List.map ((+) marg) |> List.map String.fromInt
 
         minePr =
             0.1
@@ -323,8 +340,7 @@ initGrid floatMines =
             else
                 let
                     yPoints =
-                        -- List.repeat dim (toString (cellSize * i))
-                        List.repeat dim (cellSize * i) |> List.map ((+) marg) |> List.map toString
+                        List.repeat dim (cellSize * i) |> List.map ((+) marg) |> List.map String.fromInt
 
                     showList =
                         List.repeat dim False
@@ -375,8 +391,8 @@ countNeighborMines hasMines i =
 makeSvg win { x, y, revealed, hasMine, closeMines } =
     let
         ( xx, yy ) =
-            ( Result.withDefault 0 (String.toFloat x) + cellSize / 2 |> toString
-            , Result.withDefault 0 (String.toFloat y) + cellSize / 2 |> toString
+            ( Maybe.withDefault 0 (String.toFloat x) + toFloat cellSize / 2 |> String.fromFloat
+            , Maybe.withDefault 0 (String.toFloat y) + toFloat cellSize / 2 |> String.fromFloat
             )
 
         ( mineRadius, rectColor, mineCount ) =
@@ -394,7 +410,7 @@ makeSvg win { x, y, revealed, hasMine, closeMines } =
                 , if closeMines == 0 then
                     ""
                   else
-                    toString closeMines
+                    String.fromInt closeMines
                 )
             else
                 ( "0"
@@ -417,7 +433,7 @@ makeSvg win { x, y, revealed, hasMine, closeMines } =
         []
     , Svg.text_
         [ SvgA.x xx
-        , SvgA.y (toString (Result.withDefault 0 (String.toInt y) + round (cellSize * 0.75)))
+        , SvgA.y (String.fromInt (Maybe.withDefault 0 (String.toInt y) + round (toFloat cellSize * 0.75)))
         , fontFamily "Verdana"
         , fontSize "12"
         , textAnchor "middle"

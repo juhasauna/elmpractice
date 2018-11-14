@@ -1,18 +1,16 @@
-module Main exposing (..)
+module Main exposing (Block, Color(..), Msg(..), Snake, colorToCssHsl, cssColorString, fmod, getNewHead, getOldHead, hsl, hsla, hueToString, init, main, renderBlock, rgbToHsl, size, subscriptions, tick, toHsl, toPercentString, update, view)
 
-import Color exposing (Color, hsl)
-import Color.Convert
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Time exposing (Time)
+import Time
 
 
-main : Program Never Snake Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions
@@ -37,8 +35,8 @@ type alias Snake =
     List Block
 
 
-init : ( Snake, Cmd Msg )
-init =
+init : () -> ( Snake, Cmd Msg )
+init _ =
     let
         snakeStart =
             [ Block 200 200 10 3 0
@@ -54,7 +52,7 @@ init =
 
 
 type Msg
-    = Tick Time
+    = Tick Time.Posix
     | Roll
     | UpdateSlider String
 
@@ -79,7 +77,12 @@ update msg snake =
         UpdateSlider value ->
             let
                 l =
-                    (String.toFloat value |> Result.withDefault 0) / 100
+                    -- case (String.toFloat value) of
+                    --     Ok v ->
+                    --         v / 100
+                    --     Err e ->
+                    --         0
+                    (String.toFloat value |> Maybe.withDefault 0) / 100
 
                 newHead =
                     getOldHead snake |> getNewHead l
@@ -147,7 +150,7 @@ subscriptions model =
 
 tick : Sub Msg
 tick =
-    Time.every (10 * Time.millisecond) Tick
+    Time.every 1 Tick
 
 
 
@@ -162,9 +165,6 @@ size =
 view : Snake -> Html.Html Msg
 view snake =
     let
-        parentStyle =
-            Html.Attributes.style [ ( "margin", "0 auto" ), ( "display", "block" ) ]
-
         viewBoxDimensions =
             "0 0 " ++ size ++ " " ++ size
 
@@ -184,28 +184,161 @@ view snake =
                 size
             , Svg.Attributes.height size
             , viewBox viewBoxDimensions
-            , parentStyle
+            , Html.Attributes.style "display" "block"
+            , Html.Attributes.style "margin" "0 auto"
             ]
             dots
         , input
             [ Html.Attributes.type_ "range"
             , Html.Attributes.min "1"
             , Html.Attributes.max "100"
-            , value <| toString oldHead.l
+            , value <| String.fromFloat oldHead.l
             , onInput UpdateSlider
             ]
             []
-        , Html.text <| toString oldHead.l
+        , Html.text <| String.fromFloat oldHead.l
         ]
 
 
 renderBlock : Block -> Svg Msg
 renderBlock block =
     let
-        ( strX, strY, hue ) =
-            ( toString block.x, toString block.y, block.n / 50 )
+        ( strX, strY ) =
+            ( String.fromFloat block.x, String.fromFloat block.y )
+
+        hue =
+            block.n / 50
 
         theColor =
-            Color.Convert.colorToCssHsl (Color.hsl hue 1 0.5)
+            colorToCssHsl (hsl hue 1 0.5)
     in
     Svg.circle [ cx strX, cy strY, r "2", fill theColor ] []
+
+
+colorToCssHsl : Color -> String
+colorToCssHsl cl =
+    let
+        { hue, saturation, lightness, alpha } =
+            toHsl cl
+    in
+    cssColorString "hsl"
+        [ hueToString hue
+        , toPercentString saturation ++ "%"
+        , toPercentString lightness ++ "%"
+        ]
+
+
+cssColorString : String -> List String -> String
+cssColorString kind values =
+    kind ++ "(" ++ String.join ", " values ++ ")"
+
+
+{-| Extract the components of a color in the HSL format.
+-}
+toHsl : Color -> { hue : Float, saturation : Float, lightness : Float, alpha : Float }
+toHsl color =
+    case color of
+        HSLA h s l a ->
+            { hue = h, saturation = s, lightness = l, alpha = a }
+
+        RGBA r g b a ->
+            let
+                ( h, s, l ) =
+                    rgbToHsl r g b
+            in
+            { hue = h, saturation = s, lightness = l, alpha = a }
+
+
+hsl : Float -> Float -> Float -> Color
+hsl hue saturation lightness =
+    hsla hue saturation lightness 1
+
+
+{-| Representation of colors.
+-}
+type Color
+    = RGBA Int Int Int Float
+    | HSLA Float Float Float Float
+
+
+rgbToHsl : Int -> Int -> Int -> ( Float, Float, Float )
+rgbToHsl red green blue =
+    let
+        r =
+            toFloat red / 255
+
+        g =
+            toFloat green / 255
+
+        b =
+            toFloat blue / 255
+
+        cMax =
+            Basics.max (Basics.max r g) b
+
+        cMin =
+            Basics.min (Basics.min r g) b
+
+        c =
+            cMax - cMin
+
+        hue =
+            degrees 60
+                * (if cMax == r then
+                    fmod ((g - b) / c) 6
+
+                   else if cMax == g then
+                    ((b - r) / c) + 2
+
+                   else
+                    {- cMax == b -}
+                    ((r - g) / c) + 4
+                  )
+
+        lightness =
+            (cMax + cMin) / 2
+
+        saturation =
+            if lightness == 0 then
+                0
+
+            else
+                c / (1 - abs (2 * lightness - 1))
+    in
+    ( hue, saturation, lightness )
+
+
+{-| Create [HSL colors](http://en.wikipedia.org/wiki/HSL_and_HSV)
+with an alpha component for transparency.
+-}
+hsla : Float -> Float -> Float -> Float -> Color
+hsla hue saturation lightness alpha =
+    HSLA (hue - turns (toFloat (floor (hue / (2 * pi))))) saturation lightness alpha
+
+
+fmod : Float -> Int -> Float
+fmod f n =
+    let
+        integer =
+            floor f
+    in
+    -- toFloat (integer % n) + f - toFloat integer
+    toFloat (modBy n integer) + f - toFloat integer
+
+
+hueToString : Float -> String
+hueToString =
+    (*) 180 >> (*) (1 / pi) >> round >> String.fromInt
+
+
+
+-- (*) 180 >> flip (/) pi >> round >> String.fromFloat
+
+
+toPercentString : Float -> String
+toPercentString =
+    (*) 100 >> round >> String.fromInt
+
+
+
+-- (*) 100 >> round >> String.fromFloat >> flip (++) "%"

@@ -1,7 +1,7 @@
+-- module Main exposing (Model, Msg(..), centerPoint, checkNeighbor, cols, getGridIndex, getRandomActiveKey, gridPos, init, initGrid, isTrue, main, makeCircles, orderValues, renderBackground, rows, rr, size, sizeFloat, subscriptions, update, updateActive, view, w)
 module Main exposing (..)
 
-import Color exposing (Color, hsl)
-import Color.Convert
+import Browser
 import Dict
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -9,15 +9,13 @@ import Math.Vector2 as V2 exposing (..)
 import Random
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Time exposing (Time)
-
-
--- main : Program Never (Dict.Dict Int Vec2) Msg
+import Time
 
 
 main =
-    Html.program
+    Browser.element
         { init = init
+  
         , update = update
         , subscriptions = subscriptions
         , view = view
@@ -41,7 +39,7 @@ sizeFloat =
 
 size : String
 size =
-    toString sizeFloat
+    String.fromInt sizeFloat
 
 
 rr =
@@ -87,11 +85,8 @@ initGrid =
     Model makeDict makeDict [ centerPoint.key ]
 
 
-
--- init : ( ( Dict.Dict Int Vec2, Dict.Dict Int Vec2 ), Cmd msg )
-
-
-init =
+init : () -> ( Model, Cmd msg )
+init _ =
     ( initGrid, Cmd.none )
 
 
@@ -100,7 +95,7 @@ init =
 
 
 type Msg
-    = Tick Time
+    = Tick Time.Posix
     | Roll (List Float)
 
 
@@ -156,18 +151,21 @@ update msg model =
                 grid =
                     if gridPosUsed then
                         model.grid
+
                     else
                         Dict.update gridIndex (\_ -> Just newPos) model.grid
 
                 order =
                     if gridPosUsed then
                         model.order
+
                     else
                         gridIndex :: model.order
 
                 active =
                     if gridPosUsed then
                         updateActive model.active model.grid gridIndex
+
                     else
                         Dict.insert gridIndex newPos model.active
 
@@ -217,6 +215,7 @@ updateActive active grid i =
         newActive =
             if allNeighborsOccupied then
                 Dict.remove i active
+
             else
                 active
     in
@@ -230,6 +229,7 @@ isTrue bool =
 checkNeighbor grid index =
     if Dict.member index grid then
         True
+
     else
         False
 
@@ -243,14 +243,11 @@ getGridIndex x y =
 
 
 subscriptions model =
-    Sub.batch [ Time.every (10 * Time.millisecond) Tick ]
+    Sub.batch [ Time.every 1 Tick ]
 
 
 view model =
     let
-        parentStyle =
-            Html.Attributes.style [ ( "margin", "0 auto" ), ( "display", "block" ) ]
-
         viewBoxDimensions =
             "0 0 " ++ size ++ " " ++ size
 
@@ -285,7 +282,8 @@ view model =
         [ Svg.Attributes.width size
         , Svg.Attributes.height size
         , viewBox viewBoxDimensions
-        , parentStyle
+        , Html.Attributes.style "display" "block"
+        , Html.Attributes.style "margin" "0 auto"
         ]
         dots2
 
@@ -297,6 +295,7 @@ renderBackground =
 orderValues order grid orderedList =
     if List.length order == 0 then
         orderedList
+
     else
         let
             key =
@@ -316,13 +315,116 @@ makeCircles colour v =
         hue =
             toFloat colour / 50
 
-        --(colour % 360)
         ( strX, strY ) =
-            ( toString (getX v), toString (getY v) )
+            ( String.fromFloat (getX v), String.fromFloat (getY v) )
 
         theColor =
-            Color.Convert.colorToCssHsl (Color.hsl hue 1 0.5)
+            colorToCssHsl (hsl hue 1 0.5)
+        -- _ = Debug.log "color" theColor
     in
     Svg.circle
-        [ cx strX, cy strY, r (toString rr), fill theColor ]
+        [ cx strX, cy strY, r (String.fromInt rr), fill theColor ]
         []
+
+
+colorToCssHsl : Color -> String
+colorToCssHsl cl =
+    let
+        { hue, saturation, lightness, alpha } =
+            toHsl cl
+    in
+        cssColorString "hsl"
+            [ hueToString hue
+            , toPercentString saturation ++ "%"
+            , toPercentString lightness ++ "%"
+            ]
+
+
+cssColorString : String -> List String -> String
+cssColorString kind values =
+    kind ++ "(" ++ String.join ", " values ++ ")"
+
+
+{-| Extract the components of a color in the HSL format.
+-}
+toHsl : Color -> { hue:Float, saturation:Float, lightness:Float, alpha:Float }
+toHsl color =
+  case color of
+    HSLA h s l a ->
+      { hue=h, saturation=s, lightness=l, alpha=a }
+
+    RGBA r g b a ->
+      let
+        (h,s,l) = rgbToHsl r g b
+      in
+        { hue=h, saturation=s, lightness=l, alpha=a }
+
+hsl : Float -> Float -> Float -> Color
+hsl hue saturation lightness =
+  hsla hue saturation lightness 1
+
+
+{-| Representation of colors.
+-}
+type Color
+    = RGBA Int Int Int Float
+    | HSLA Float Float Float Float
+
+rgbToHsl : Int -> Int -> Int -> (Float,Float,Float)
+rgbToHsl red green blue =
+  let
+    r = toFloat red   / 255
+    g = toFloat green / 255
+    b = toFloat blue  / 255
+
+    cMax = Basics.max (Basics.max r g) b
+    cMin = Basics.min (Basics.min r g) b
+
+    c = cMax - cMin
+
+    hue =
+      degrees 60 *
+        if cMax == r then
+          fmod ((g - b) / c) 6
+        else if cMax == g then
+          ((b - r) / c) + 2
+        else {- cMax == b -}
+          ((r - g) / c) + 4
+
+    lightness =
+      (cMax + cMin) / 2
+
+    saturation =
+      if lightness == 0 then
+        0
+      else
+        c / (1 - abs (2 * lightness - 1))
+  in
+    (hue, saturation, lightness)
+
+{-| Create [HSL colors](http://en.wikipedia.org/wiki/HSL_and_HSV)
+with an alpha component for transparency.
+-}
+hsla : Float -> Float -> Float -> Float -> Color
+hsla hue saturation lightness alpha =
+  HSLA (hue - turns (toFloat (floor (hue / (2*pi))))) saturation lightness alpha
+
+
+fmod : Float -> Int -> Float
+fmod f n =
+  let
+    integer = floor f
+  in
+    -- toFloat (integer % n) + f - toFloat integer
+    toFloat (modBy n integer) + f - toFloat integer
+
+hueToString : Float -> String
+hueToString =
+    (*) 180 >> (*) (1/pi) >> round >> String.fromInt
+    -- (*) 180 >> flip (/) pi >> round >> String.fromFloat
+
+toPercentString : Float -> String
+toPercentString =
+    (*) 100 >> round >> String.fromInt
+    
+    -- (*) 100 >> round >> String.fromFloat >> flip (++) "%"

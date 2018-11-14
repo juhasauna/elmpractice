@@ -1,17 +1,17 @@
 module RandomWalker exposing (..)
 
+import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Random
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Time exposing (Time)
+import Time
 
 
-main : Program Never Model Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions
@@ -37,8 +37,8 @@ type alias Model =
     { trace : List Walker, stop : Bool }
 
 
-init : ( Model, Cmd msg )
-init =
+init : () -> ( Model, Cmd msg )
+init _ =
     ( Model [ Walker 300 300 ] False, Cmd.none )
 
 
@@ -47,7 +47,7 @@ init =
 
 
 type Msg
-    = Tick Time
+    = Tick Time.Posix
     | Roll (List Float)
     | ReleaseWalker
 
@@ -93,7 +93,7 @@ subscriptions model =
     if model.stop then
         Sub.none
     else
-        Sub.batch [ Time.every (10 * Time.millisecond) Tick ]
+        Sub.batch [ Time.every 1 Tick ]
 
 
 
@@ -103,8 +103,6 @@ subscriptions model =
 view : Model -> Html.Html Msg
 view model =
     let
-        parentStyle =
-            Html.Attributes.style [ ( "margin", "0 auto" ), ( "display", "block" ) ]
 
         viewBoxDimensions =
             "0 0 " ++ size ++ " " ++ size
@@ -124,7 +122,9 @@ view model =
                 size
             , Svg.Attributes.height size
             , viewBox viewBoxDimensions
-            , parentStyle
+            , (Html.Attributes.style "display" "block")
+            , (Html.Attributes.style "margin" "0 auto")
+
             ]
             dots
         , Html.button [ Html.Events.onClick ReleaseWalker ] [ Html.text "WALK!" ]
@@ -134,9 +134,17 @@ view model =
 makeLines : Walker -> Walker -> Svg Msg
 makeLines pos1 pos2 =
     let
-        ( strX, strY, strX2, strY2 ) =
-            ( toString pos1.x, toString pos1.y, toString pos2.x, toString pos2.y )
+
+        xys = LineCoordinates (String.fromFloat pos1.x) (String.fromFloat pos1.y) (String.fromFloat pos2.x) (String.fromFloat pos2.y)
     in
     Svg.line
-        [ x1 strX, y1 strY, x2 strX2, y2 strY2, stroke "black" ]
+        [ x1 xys.x1, y1 xys.y1, x2 xys.x2, y2 xys.y2, stroke "black" ]
         []
+
+
+type alias LineCoordinates =
+    { x1 : String
+    , y1 : String
+    , x2 : String
+    , y2 : String
+    }

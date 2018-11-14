@@ -1,12 +1,13 @@
 module Main exposing (..)
 
+import Browser
 import Array
 import Html exposing (..)
 import Html.Events exposing (..)
 import Random
 import Svg exposing (..)
 import Svg.Attributes as SvgA exposing (..)
-import Time exposing (Time)
+import Time
 
 
 dim =
@@ -22,7 +23,7 @@ cellSize =
 
 
 strCS =
-    toString cellSize
+    String.fromFloat cellSize
 
 
 initWalls =
@@ -47,15 +48,15 @@ type alias Model =
     , stack : List Int
     }
 
-
-init =
+init : () -> (Model, Cmd Msg)
+init _ =
     ( Model initGrid 0 [], Cmd.none )
 
 
 initGrid =
     let
         xs =
-            List.range 0 (dim - 1) |> List.map ((*) cellSize) |> List.map toString
+            List.range 0 (dim - 1) |> List.map ((*) cellSize) |> List.map String.fromInt
 
         makeCells lst i =
             if i < 0 then
@@ -63,7 +64,7 @@ initGrid =
             else
                 let
                     ys =
-                        toString (cellSize * i)
+                        String.fromFloat (cellSize * i)
 
                     newList =
                         List.concat [ List.map (\x -> Cell x ys False initWalls) xs, lst ]
@@ -74,7 +75,7 @@ initGrid =
 
 
 type Msg
-    = Tick Time
+    = Tick Time.Posix
     | NextCell Float
 
 
@@ -114,13 +115,13 @@ removeWalls grid current next =
     let
         getXY index =
             let
-                y =
-                    rem index dim
+                y_ =
+                    remainderBy dim index
 
-                x =
-                    toFloat (index - y) / dim
+                x_ =
+                    toFloat (index - y_) / dim
             in
-            ( x, y )
+            ( x_, y_ )
 
         ( cx, cy ) =
             getXY current
@@ -234,12 +235,12 @@ getNextCell i grid dir =
     randomNeighborIndex
 
 
-notVisited i grid =
-    let
-        cell =
-            getCell i grid
-    in
-    not cell.visited
+-- notVisited i grid =
+--     let
+--         cell =
+--             getCell i grid
+--     in
+--     not cell.visited
 
 
 getNeighbors i =
@@ -250,10 +251,10 @@ getNeighbors i =
                 |> List.filter (\n -> n < cellCount)
 
         checkFirstAndLastCols =
-            if rem i dim == 0 then
+            if remainderBy dim i == 0 then
                 -- first col
                 List.filter (\n -> n /= i - 1) neighbors
-            else if rem i dim == (dim - 1) then
+            else if remainderBy dim i == (dim - 1) then
                 -- last col
                 List.filter (\n -> n /= i + 1) neighbors
             else
@@ -264,13 +265,13 @@ getNeighbors i =
 
 subscriptions model =
     -- Sub.none
-    Sub.batch [ Time.every (10 * Time.millisecond) Tick ]
+    Sub.batch [ Time.every 1 Tick ]
 
 
 view model =
     let
         gridSize =
-            toString (dim * cellSize + 1)
+            String.fromFloat (dim * cellSize + 1)
 
         f =
             makeSvg model.current
@@ -291,17 +292,18 @@ view model =
             , SvgA.height gridSize
             ]
             shapes
-        , Html.button [ Html.Events.onClick (Tick Time.millisecond) ] [ Html.text "Step" ]
+        -- , Html.button [ Html.Events.onClick (Tick Time.millisecond) ] [ Html.text "Step" ]
+        , Html.button [ Html.Events.onClick (Tick <| Time.millisToPosix 10) ] [ Html.text "Step" ]
         ]
 
 
 getIndex sx sy =
     let
         x =
-            (String.toFloat sx |> Result.withDefault 0) / cellSize
+            (String.toFloat sx |> Maybe.withDefault 0) / cellSize
 
         y =
-            (String.toFloat sy |> Result.withDefault 0) / cellSize
+            (String.toFloat sy |> Maybe.withDefault 0) / cellSize
 
         ret =
             x + dim * y
@@ -338,10 +340,10 @@ eraseLines cell =
             cell.walls
 
         sx1 =
-            (String.toInt cell.x |> Result.withDefault 0) + cellSize |> toString
+            (String.toInt cell.x |> Maybe.withDefault 0) + cellSize |> String.fromInt
 
         sy1 =
-            (String.toInt cell.y |> Result.withDefault 0) + cellSize |> toString
+            (String.toInt cell.y |> Maybe.withDefault 0) + cellSize |> String.fromInt
 
         color =
             "black"
@@ -393,7 +395,7 @@ eraseLines cell =
 
 
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions

@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Html exposing (..)
+import Browser exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Math.Vector2 as V2 exposing (..)
@@ -10,7 +11,7 @@ import Svg.Attributes exposing (..)
 
 
 main =
-    Html.program
+    Browser.element
         { init = init
         , view = view
         , update = update
@@ -33,11 +34,9 @@ type alias Line_ =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( Model [], Random.generate NewFace (Random.list (2 * intSize) (Random.float 0 1)) )
-
-
+init : () -> ( Model, Cmd Msg )
+init _ =
+        ( Model [], Random.generate NewFace (Random.list (2 * intSize) (Random.float 0 1)) )
 
 -- UPDATE
 
@@ -71,11 +70,11 @@ subscriptions model =
 
 
 intSize =
-    800
+   800 
 
 
 size =
-    toString intSize
+    String.fromInt intSize
 
 
 spacing =
@@ -111,7 +110,7 @@ tenPrintLines randFloats lines =
                 List.length randFloats
 
             x =
-                rem (spacing * len) intSize |> toFloat
+                remainderBy intSize (spacing * len) |> toFloat
 
             y =
                 ((spacing * len) // intSize) * spacing |> toFloat
@@ -130,13 +129,20 @@ tenPrintLines randFloats lines =
         in
         tenPrintLines (List.drop 1 randFloats) newLines
 
+type alias LineCoordinates =
+    { x1 : String
+    , y1 : String
+    , x2 : String
+    , y2 : String
+    }
+
+
 
 makeLine : Line_ -> Svg Msg
 makeLine line_ =
     let
-        ( strX, strY, strX2, strY2 ) =
-            ( toString (getX line_.a), toString (getY line_.a), toString (getX line_.b), toString (getY line_.b) )
+        xys = LineCoordinates (String.fromFloat (getX line_.a)) (String.fromFloat (getY line_.a)) (String.fromFloat (getX line_.b)) (String.fromFloat (getY line_.b))
     in
     Svg.line
-        [ x1 strX, y1 strY, x2 strX2, y2 strY2, stroke "black" ]
+        [ x1 xys.x1, y1 xys.y1, x2 xys.x2, y2 xys.y2, stroke "black" ]
         []

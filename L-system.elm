@@ -1,11 +1,12 @@
 module Main exposing (..)
 
+import Browser
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (style)
 import Math.Vector2 as V2 exposing (..)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Utils exposing (..)
+import Math.Vector2 as V2 exposing (..)
 
 
 rules : { a : String, b : String }
@@ -25,7 +26,7 @@ size =
 svgLine : Float -> Float -> Float -> Float -> Svg msg
 svgLine x1_ y1_ x2_ y2_ =
     Svg.line
-        [ x1 (x1_ |> toString), y1 (y1_ |> toString), x2 (x2_ |> toString), y2 (y2_ |> toString), stroke "black" ]
+        [ x1 (x1_ |> String.fromFloat), y1 (y1_ |> String.fromFloat), x2 (x2_ |> String.fromFloat), y2 (y2_ |> String.fromFloat), stroke "black" ]
         []
 
 
@@ -62,8 +63,6 @@ generate sentence i =
 main : Html msg
 main =
     let
-        parentStyle =
-            Html.Attributes.style [ ( "margin", "0 auto" ), ( "display", "block" ) ]
 
         viewBoxDimensions =
             "0 0 " ++ size ++ " " ++ size
@@ -88,7 +87,8 @@ main =
             [ Svg.Attributes.width size
             , Svg.Attributes.height size
             , viewBox viewBoxDimensions
-            , parentStyle
+            , (Html.Attributes.style "display" "block")
+            , (Html.Attributes.style "margin" "0 auto")
             ]
             lines
         ]
@@ -102,21 +102,24 @@ turtle2 sentence i lst angle base l =
             current =
                 String.slice i (i + 1) sentence
 
-            ( newList, newAngle, newBase, newL ) =
+
+            next =
                 if current == "+" then
-                    changeAngle "+" lst angle base l
+                    {lst = lst, angle = angle + degrees 22.5, base = base, l = l}
                 else if current == "-" then
-                    changeAngle "-" lst angle base l
+                    {lst = lst, angle = angle - degrees 22.5, base = base, l = l}
                 else if current == "[" then
-                    push lst angle base l
+                    {lst = lst, angle = angle, base = getFirstListVectorTuple lst :: base, l = l * 0.9}
                 else if current == "]" then
-                    pop lst angle base l
+                    {lst = getFirstListVectorTuple base :: lst, angle = angle, base = List.drop 1 base, l = l}
                 else if current == "F" then
-                    makeNewVector lst angle base l
+                    {lst = makeNewVector lst angle base l, angle = angle, base = base, l = l}
                 else
-                    ( [], 0, [], 0 )
+                    {lst = [], angle = 0, base = [], l = 0}
+
+
         in
-        turtle2 sentence (i + 1) newList newAngle newBase newL
+        turtle2 sentence (i + 1) next.lst next.angle next.base next.l
 
 
 makeNewVector lst angle base l =
@@ -131,7 +134,7 @@ makeNewVector lst angle base l =
             getFirstListVectorTuple lst
 
         rotated =
-            Utils.rotate v1 v0 angle
+            rotate v1 v0 angle
 
         dist =
             20
@@ -142,46 +145,12 @@ makeNewVector lst angle base l =
         v11 =
             V2.add v1 (V2.scale -(dist * scaleFactor) dir)
 
-        log =
-            toString dist ++ toString rotated ++ toString v11
-
         newList =
             ( v1, v11 ) :: lst
     in
-    ( newList, angle, base, l )
+    newList
 
 
-pop lst angle base l =
-    let
-        newBase =
-            List.drop 1 base
-
-        newList =
-            getFirstListVectorTuple base :: lst
-    in
-    ( newList, angle, newBase, l )
-
-
-push lst angle base l =
-    let
-        newL =
-            l * 0.9
-
-        newBase =
-            getFirstListVectorTuple lst :: base
-    in
-    ( lst, angle, newBase, newL )
-
-
-changeAngle sign lst angle base l =
-    let
-        angleChange =
-            if sign == "+" then
-                degrees 22.5
-            else
-                degrees -22.5
-    in
-    ( lst, angle + angleChange, base, l )
 
 
 makeLines vectorList lineList =
@@ -192,13 +161,34 @@ makeLines vectorList lineList =
             ( v0, v2 ) =
                 getFirstListVectorTuple vectorList
 
-            ( x1, y1, x2, y2 ) =
-                ( V2.getX v0, V2.getY v0, V2.getX v2, V2.getY v2 )
+
+            xys = {x1 = V2.getX v0, y1 = V2.getY v0, x2 = V2.getX v2, y2 = V2.getY v2}
+
 
             newLine =
-                svgLine x1 y1 x2 y2
+                svgLine xys.x1 xys.y1 xys.x2 xys.y2
 
             newList =
                 newLine :: lineList
         in
         makeLines (List.drop 1 vectorList) newList
+
+
+
+
+rotate : Vec2 -> Vec2 -> Float -> Vec2
+rotate v1 v2 angle =
+    let
+        dist =
+            V2.distance v1 v2
+
+        x =
+            cos angle * dist
+
+        y =
+            sin angle * dist
+
+        newV =
+            V2.vec2 x y |> V2.add v1
+    in
+    newV

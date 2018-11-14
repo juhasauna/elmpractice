@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import Browser
 import Html exposing (Html, div, input, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (on, onInput)
@@ -7,7 +8,6 @@ import Math.Vector2 as V2 exposing (..)
 import String
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Utils exposing (..)
 
 
 size =
@@ -17,14 +17,14 @@ size =
 svgLine : Float -> Float -> Float -> Float -> Svg msg
 svgLine x1_ y1_ x2_ y2_ =
     Svg.line
-        [ x1 (x1_ |> toString), y1 (y1_ |> toString), x2 (x2_ |> toString), y2 (y2_ |> toString), stroke "black" ]
+        [ x1 (x1_ |> String.fromFloat), y1 (y1_ |> String.fromFloat), x2 (x2_ |> String.fromFloat), y2 (y2_ |> String.fromFloat), stroke "black" ]
         []
 
 
 svgLine2 : Float -> Float -> Float -> Float -> Float -> Svg msg
 svgLine2 x1_ y1_ x2_ y2_ w =
     Svg.line
-        [ x1 (x1_ |> toString), y1 (y1_ |> toString), x2 (x2_ |> toString), y2 (y2_ |> toString), stroke "black", strokeWidth (toString w) ]
+        [ x1 (x1_ |> String.fromFloat), y1 (y1_ |> String.fromFloat), x2 (x2_ |> String.fromFloat), y2 (y2_ |> String.fromFloat), stroke "black", strokeWidth (String.fromFloat w) ]
         []
 
 
@@ -32,7 +32,7 @@ makeLines : Vec2 -> Vec2 -> Float -> Float -> Float -> List (Svg msg) -> List (S
 makeLines v0 v1 angle girth angleOff lst =
     let
         v11 =
-            Utils.rotate v0 v1 (degrees angle)
+            rotate v0 v1 (degrees angle)
 
         dist =
             V2.distance v0 v1
@@ -60,7 +60,7 @@ makeLines v0 v1 angle girth angleOff lst =
                 List.concat [ left_, right_ ]
 
         -- log =
-        --     toString (List.length newList) ++ toString dist
+        --     String.fromFloat (List.length newList) ++ String.fromFloat dist
         -- _ =
         --     Debug.log "l" log
     in
@@ -79,14 +79,13 @@ update : Msg -> Model -> Model
 update msg model =
     case msg of
         UpdateSlider1 value ->
-            String.toFloat value |> Result.withDefault 330
+            String.toFloat value |> Maybe.withDefault 330
 
 
 view : Model -> Html.Html Msg
 view model =
     let
-        parentStyle =
-            Html.Attributes.style [ ( "margin", "0 auto" ), ( "display", "block" ) ]
+
 
         viewBoxDimensions =
             "0 0 " ++ size ++ " " ++ size
@@ -108,26 +107,46 @@ view model =
             [ Svg.Attributes.width size
             , Svg.Attributes.height size
             , viewBox viewBoxDimensions
-            , parentStyle
+            , Html.Attributes.style "display" "block"
+            , Html.Attributes.style "margin" "0 auto"
             ]
             lines
         , input
             [ type_ "range"
             , Html.Attributes.min "0"
             , Html.Attributes.max "360"
-            , Html.Attributes.defaultValue "330"
-            , Html.Attributes.value <| toString model
+            -- , Html.Attributes.defaultValue "330"
+            , Html.Attributes.value <| String.fromFloat model
             , onInput UpdateSlider1
             ]
             []
-        , Html.text <| toString model
+        , Html.text <| String.fromFloat model
         ]
 
+init = 330
 
-main : Program Never Float Msg
+
 main =
-    Html.beginnerProgram
-        { model = 330
-        , view = view
+    Browser.sandbox
+        { view = view
+        , init = init
         , update = update
         }
+
+
+rotate : Vec2 -> Vec2 -> Float -> Vec2
+rotate v1 v2 angle =
+    let
+        dist =
+            V2.distance v1 v2
+
+        x =
+            cos angle * dist
+
+        y =
+            sin angle * dist
+
+        newV =
+            V2.vec2 x y |> V2.add v1
+    in
+    newV

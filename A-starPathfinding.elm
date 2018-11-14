@@ -1,17 +1,22 @@
 module Main exposing (..)
 
+import Browser
 import Array
 import Html exposing (..)
 import Html.Events exposing (..)
 import Random
 import Svg exposing (..)
 import Svg.Attributes as SvgA exposing (..)
-import Time exposing (Time)
+import Time
 
 
 dim : Int
 dim =
     40
+
+
+works =
+    1234
 
 
 cellCount : Int
@@ -31,7 +36,7 @@ cellSize =
 
 strCS : String
 strCS =
-    toString cellSize
+    String.fromInt cellSize
 
 
 start =
@@ -40,7 +45,7 @@ start =
             cellCount // 2
 
         leftMidEdge =
-            mid - rem mid dim
+            mid - remainderBy dim mid
     in
     leftMidEdge
 
@@ -76,8 +81,8 @@ type alias Model =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : () -> ( Model, Cmd Msg )
+init _ =
     ( Model initGrid start False [ start ] [], Random.generate AddObstacles (Random.list (cellCount - 1) (Random.float 0 1)) )
 
 
@@ -105,7 +110,7 @@ initGrid =
 
 
 type Msg
-    = Tick Time
+    = Tick Time.Posix
     | AddObstacles (List Float)
 
 
@@ -151,11 +156,11 @@ update msg model =
                         grid
                     else
                         let
-                            newGrid =
+                            tempGrid =
                                 if (List.head floats |> Maybe.withDefault 0) < obstacleFrequency then
                                     let
                                         remainder =
-                                            rem floatsLeft dim
+                                            remainderBy dim floatsLeft
 
                                         notInFirstOrLastColumn =
                                             remainder /= 0 && remainder /= (dim - 1)
@@ -167,7 +172,7 @@ update msg model =
                                 else
                                     grid
                         in
-                        addObstacles newGrid (List.drop 1 floats)
+                        addObstacles tempGrid (List.drop 1 floats)
 
                 newGrid =
                     addObstacles model.grid randFloats
@@ -177,7 +182,7 @@ update msg model =
 
 getRowAndCol : Int -> { row : Int, col : Int }
 getRowAndCol i =
-    { row = i // dim, col = rem i dim }
+    { row = i // dim, col = remainderBy dim i }
 
 
 dist : Int -> Int -> Int
@@ -267,10 +272,10 @@ updateCurrentNeighbors model =
                             in
                             { neighborCell | previous = current, fgh = Fgh f g h }
 
-                    newGrid =
+                    tempGrid =
                         Array.set head newNeighborCell grid
                 in
-                updateGrid newGrid (List.drop 1 activeLst) current
+                updateGrid tempGrid (List.drop 1 activeLst) current
 
         newGrid =
             updateGrid model.grid active model.current
@@ -307,9 +312,9 @@ getNeighbors i =
                 |> List.filter (\n -> n < cellCount)
 
         removeEdges =
-            if rem i dim == 0 then
+            if remainderBy dim i == 0 then
                 List.filter (\n -> n /= i - 1) neighbors
-            else if rem i dim == (dim - 1) then
+            else if remainderBy dim i == (dim - 1) then
                 List.filter (\n -> n /= i + 1) neighbors
             else
                 neighbors
@@ -323,14 +328,14 @@ subscriptions model =
     if model.done then
         Sub.none
     else
-        Sub.batch [ Time.every (10 * Time.millisecond) Tick ]
+        Sub.batch [ Time.every 1 Tick ]
 
 
 view : Model -> Html Msg
 view model =
     let
         gridSize =
-            toString (dim * cellSize + 1)
+            String.fromInt (dim * cellSize + 1)
 
         rects =
             Array.toList (Array.map (makeGridSvg model) model.grid)
@@ -345,7 +350,7 @@ view model =
             , SvgA.height gridSize
             ]
             shapes
-        , Html.button [ Html.Events.onClick (Tick Time.millisecond) ] [ Html.text "Step" ]
+        , Html.button [ Html.Events.onClick (Tick <| Time.millisToPosix 10) ] [ Html.text "Step" ]
         ]
 
 
@@ -371,7 +376,7 @@ makePathSvg model =
         makePathDot p =
             let
                 getMiddle index =
-                    (index * cellSize + cellSize // 2) |> toString
+                    (index * cellSize + cellSize // 2) |> String.fromInt
 
                 point =
                     getRowAndCol p
@@ -399,7 +404,7 @@ makeGridSvg model cell =
             getRowAndCol cell.i
 
         makeScaledString index =
-            (index * cellSize) |> toString
+            (index * cellSize) |> String.fromInt
 
         ( x, y ) =
             ( makeScaledString point.col, makeScaledString point.row )
@@ -430,9 +435,8 @@ makeGridSvg model cell =
         []
 
 
-main : Program Never Model Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , update = update
         , subscriptions = subscriptions
